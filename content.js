@@ -6,7 +6,7 @@ chrome.runtime.sendMessage({action: "contentScriptLoaded"}, function(response) {
 
 async function getProductMedia() {
   try {
-    await loadAllVariantImages();
+    await loadAllVariantImagesAndVideos();
     const images = getHighQualityImages();
     const videos = getVideos();
     const variantImages = getVariantImages();
@@ -24,12 +24,12 @@ async function getProductMedia() {
   }
 }
 
-async function loadAllVariantImages() {
-  const variantThumbs = document.querySelectorAll('.imageThumbnail');
+async function loadAllVariantImagesAndVideos() {
+  const variantThumbs = document.querySelectorAll('.imageThumbnail, .videoThumbnail');
   for (let thumb of variantThumbs) {
     await new Promise(resolve => {
       thumb.click();
-      setTimeout(resolve, 500); // Wait for 500ms to ensure image loads
+      setTimeout(resolve, 500); // Reduced wait time to 500ms
     });
   }
 }
@@ -130,9 +130,35 @@ function isHighQualityImage(url) {
 
 function getVideos() {
   const videos = [];
-  const videoElements = document.querySelectorAll('script[type="text/template"]');
   
-  videoElements.forEach(script => {
+  // Check for video in the main media container
+  const mainVideoElement = document.querySelector('#main-video-container video');
+  if (mainVideoElement && mainVideoElement.src) {
+    const thumbnailUrl = mainVideoElement.poster || getVideoThumbnail(mainVideoElement);
+    videos.push({
+      url: mainVideoElement.src,
+      thumbnailUrl: thumbnailUrl,
+      type: 'video'
+    });
+  }
+  
+  // Check for videos in the variant selector
+  const videoElements = document.querySelectorAll('.videoThumbnail');
+  videoElements.forEach(element => {
+    const dataUrl = element.getAttribute('data-url');
+    const thumbnailUrl = element.querySelector('img')?.src || '';
+    if (dataUrl) {
+      videos.push({
+        url: dataUrl,
+        thumbnailUrl: thumbnailUrl,
+        type: 'video'
+      });
+    }
+  });
+
+  // Check for videos in script tags
+  const scriptElements = document.querySelectorAll('script[type="text/template"]');
+  scriptElements.forEach(script => {
     try {
       const content = JSON.parse(script.textContent);
       if (content.videos && Array.isArray(content.videos)) {
@@ -140,6 +166,7 @@ function getVideos() {
           if (video.url) {
             videos.push({
               url: video.url,
+              thumbnailUrl: video.thumbnailUrl || '',
               type: 'video'
             });
           }
@@ -151,6 +178,14 @@ function getVideos() {
   });
 
   return videos;
+}
+
+function getVideoThumbnail(videoElement) {
+  const canvas = document.createElement('canvas');
+  canvas.width = videoElement.videoWidth;
+  canvas.height = videoElement.videoHeight;
+  canvas.getContext('2d').drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg');
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

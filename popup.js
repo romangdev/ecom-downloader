@@ -68,27 +68,54 @@ function displayMedia(media) {
   function createMediaElement(item) {
     const div = document.createElement('div');
     div.className = 'media-item';
-
+    div.style.position = 'relative';
+    div.style.display = 'inline-block';
+    div.style.marginRight = '10px';
+    div.style.marginBottom = '10px';
+  
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = true;
     div.appendChild(checkbox);
-
+  
+    const img = document.createElement('img');
+    img.src = item.type === 'video' ? item.thumbnailUrl : item.url;
+    img.width = 100;
+    img.height = 100;
+    img.style.objectFit = 'cover';
+    img.alt = item.type === 'video' ? 'Video thumbnail' : (item.alt || 'Product image');
+    div.appendChild(img);
+  
     if (item.type === 'video') {
-      const video = document.createElement('video');
-      video.src = item.url;
-      video.width = 100;
-      video.controls = true;
-      div.appendChild(video);
-    } else {
-      const img = document.createElement('img');
-      img.src = item.url;
-      img.width = 100;
-      img.alt = item.alt;
-      div.appendChild(img);
+      const playIcon = document.createElement('div');
+      playIcon.style.position = 'absolute';
+      playIcon.style.top = '50%';
+      playIcon.style.left = '50%';
+      playIcon.style.transform = 'translate(-50%, -50%)';
+      playIcon.style.width = '30px';
+      playIcon.style.height = '30px';
+      playIcon.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+      playIcon.style.borderRadius = '50%';
+      playIcon.style.display = 'flex';
+      playIcon.style.alignItems = 'center';
+      playIcon.style.justifyContent = 'center';
+  
+      const triangleIcon = document.createElement('div');
+      triangleIcon.style.width = '0';
+      triangleIcon.style.height = '0';
+      triangleIcon.style.borderTop = '7px solid transparent';
+      triangleIcon.style.borderBottom = '7px solid transparent';
+      triangleIcon.style.borderLeft = '12px solid white';
+      triangleIcon.style.marginLeft = '3px';
+  
+      playIcon.appendChild(triangleIcon);
+      div.appendChild(playIcon);
+  
+      // Store both video URL and thumbnail URL as data attributes
+      div.dataset.videoUrl = item.url;
+      div.dataset.thumbnailUrl = item.thumbnailUrl;
     }
-
-    console.log(`Created media element: ${item.type} - ${item.url}`);
+  
     return div;
   }
 
@@ -109,10 +136,11 @@ function displayMedia(media) {
 async function downloadAll() {
   const selectedItems = Array.from(document.querySelectorAll('.media-item input:checked'))
     .map(checkbox => {
-      const mediaElement = checkbox.parentElement.querySelector('img, video');
+      const mediaItem = checkbox.parentElement;
+      const isVideo = mediaItem.querySelector('[style*="border-left: 12px solid white"]') !== null;
       return {
-        url: mediaElement.src,
-        type: mediaElement.tagName.toLowerCase()
+        url: isVideo ? mediaItem.dataset.videoUrl : mediaItem.querySelector('img').src,
+        type: isVideo ? 'video' : 'image'
       };
     });
 
@@ -121,48 +149,70 @@ async function downloadAll() {
     return;
   }
 
-  const zip = new JSZip();
-  const fetchPromises = selectedItems.map((item, index) => {
+  if (selectedItems.length === 1) {
+    // Download single file directly
+    const item = selectedItems[0];
     const extension = item.type === 'video' ? 'mp4' : 'jpg';
-    const filename = `amazon_media_${index + 1}.${extension}`;
-    return fetch(item.url)
-      .then(response => response.blob())
-      .then(blob => {
-        zip.file(filename, blob);
-      });
-  });
-
-  try {
-    await Promise.all(fetchPromises);
-    const content = await zip.generateAsync({type: "blob"});
-    const url = URL.createObjectURL(content);
+    const filename = `amazon_media.${extension}`;
+    
     chrome.downloads.download({
-      url: url,
-      filename: "amazon_media.zip",
+      url: item.url,
+      filename: filename,
       saveAs: true
     }, (downloadId) => {
       if (chrome.runtime.lastError) {
         console.error(chrome.runtime.lastError);
-        alert('Error downloading files. Please try again.');
+        alert('Error downloading file. Please try again.');
       } else {
-        console.log(`Zip file downloaded with ID: ${downloadId}`);
+        console.log(`File downloaded with ID: ${downloadId}`);
       }
-      URL.revokeObjectURL(url);
     });
-  } catch (error) {
-    console.error('Error creating zip file:', error);
-    alert('Error creating zip file. Please try again.');
+  } else {
+    // Download multiple files as zip
+    const zip = new JSZip();
+    const fetchPromises = selectedItems.map((item, index) => {
+      const extension = item.type === 'video' ? 'mp4' : 'jpg';
+      const filename = `amazon_media_${index + 1}.${extension}`;
+      return fetch(item.url)
+        .then(response => response.blob())
+        .then(blob => {
+          zip.file(filename, blob);
+        });
+    });
+
+    try {
+      await Promise.all(fetchPromises);
+      const content = await zip.generateAsync({type: "blob"});
+      const url = URL.createObjectURL(content);
+      chrome.downloads.download({
+        url: url,
+        filename: "amazon_media.zip",
+        saveAs: true
+      }, (downloadId) => {
+        if (chrome.runtime.lastError) {
+          console.error(chrome.runtime.lastError);
+          alert('Error downloading files. Please try again.');
+        } else {
+          console.log(`Zip file downloaded with ID: ${downloadId}`);
+        }
+        URL.revokeObjectURL(url);
+      });
+    } catch (error) {
+      console.error('Error creating zip file:', error);
+      alert('Error creating zip file. Please try again.');
+    }
   }
 }
 
 function exportToCSV() {
   const selectedItems = Array.from(document.querySelectorAll('.media-item input:checked'))
     .map(checkbox => {
-      const mediaElement = checkbox.parentElement.querySelector('img, video');
+      const mediaItem = checkbox.parentElement;
+      const isVideo = mediaItem.querySelector('[style*="border-left: 12px solid white"]') !== null;
       return {
-        url: mediaElement.src,
-        type: mediaElement.tagName.toLowerCase(),
-        alt: mediaElement.alt || ''
+        url: isVideo ? mediaItem.dataset.videoUrl : mediaItem.querySelector('img').src,
+        type: isVideo ? 'video' : 'image',
+        alt: mediaItem.querySelector('img').alt || ''
       };
     });
 
@@ -178,6 +228,7 @@ function exportToCSV() {
   const encodedUri = encodeURI(csvContent);
   chrome.downloads.download({
     url: encodedUri,
-    filename: "amazon_media_links.csv"
+    filename: "amazon_media_links.csv",
+    saveAs: true
   });
 }
