@@ -1,5 +1,5 @@
 body {
-  width: 300px;
+  width: 400px;
   padding: 10px;
   font-family: Arial, sans-serif;
 }
@@ -9,41 +9,67 @@ h1 {
   margin-bottom: 10px;
 }
 
-#mediaContainer {
-  max-height: 300px;
-  overflow-y: auto;
+#tabContainer {
+  display: flex;
   margin-bottom: 10px;
 }
 
-.media-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 5px;
-  position: relative;
-}
-
-.media-item input[type="checkbox"] {
-  margin-right: 5px;
-}
-
-.play-icon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 24px;
-  color: white;
-  background-color: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-button {
-  width: 100%;
+.tabButton {
+  flex: 1;
   padding: 5px;
+  background-color: #f0f0f0;
+  border: none;
+  cursor: pointer;
+}
+
+.tabButton.active {
+  background-color: #e0e0e0;
+  font-weight: bold;
+}
+
+.tabContent {
+  display: none;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.tabContent.active {
+  display: block;
+}
+
+.variationGroup {
+  margin-bottom: 15px;
+}
+
+.variationTitle {
+  font-weight: bold;
   margin-bottom: 5px;
+}
+
+.defaultVariation {
+  color: red;
+  font-size: 0.9em;
+}
+
+.mediaItem {
+  display: inline-block;
+  margin: 5px;
+  text-align: center;
+}
+
+.mediaItem img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+}
+
+#actionButtons {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+#actionButtons button {
+  flex: 1;
+  margin: 0 5px;
 }

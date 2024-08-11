@@ -7,19 +7,23 @@
 <body>
   <h1>Amazon Media Downloader</h1>
   <div id="loadingIndicator" class="loading">Loading media...</div>
-  <div id="selectAllContainer" style="display: none;">
-    <label>
-      <input type="checkbox" id="selectAll" checked>
-      Select All
-    </label>
+  <div id="tabContainer">
+    <button id="imagesTab" class="tabButton active">Images (<span id="imageCount">0</span>)</button>
+    <button id="videosTab" class="tabButton">Videos (<span id="videoCount">0</span>)</button>
   </div>
-  <div id="mediaContainer"></div>
-  <button id="downloadAll">Download Selected</button>
-  <button id="exportCSV">Export Selected to CSV</button>
-
+  <div id="contentContainer">
+    <div id="imagesContent" class="tabContent active">
+      <div id="imageVariations"></div>
+    </div>
+    <div id="videosContent" class="tabContent">
+      <div id="videoList"></div>
+    </div>
+  </div>
+  <div id="actionButtons">
+    <button id="exportCSV">Export Selected to CSV</button>
+    <button id="downloadAll">Download Selected</button>
+  </div>
   <script src="jszip.min.js"></script>
-  <script src="hls.min.js"></script>
-  <script src="mp4box.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

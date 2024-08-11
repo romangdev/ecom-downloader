@@ -4,16 +4,14 @@ chrome.runtime.sendMessage({action: "contentScriptLoaded"}, function(response) {
   console.log("Content script loaded message sent");
 });
 
-// content.js
-
 function getProductMedia() {
   console.log("getProductMedia function called");
   const mediaData = extractMediaData();
   console.log("Extracted media data:", mediaData);
-  const { mainImages, variantImages } = getImages(mediaData);
+  const { mainImages, variantImages, variants, defaultVariant } = getImages(mediaData);
   const videos = getVideos(mediaData);
 
-  return { mainImages, variantImages, videos };
+  return { mainImages, variantImages, videos, defaultVariant };
 }
 
 function extractMediaData() {
@@ -22,7 +20,6 @@ function extractMediaData() {
 
   const scripts = document.querySelectorAll('script');
   
-  // Extract colorImages and video data
   const dataScript = Array.from(scripts).find(script => script.textContent.includes('var obj = jQuery.parseJSON'));
   if (dataScript) {
     const scriptContent = dataScript.textContent;
@@ -46,27 +43,33 @@ function extractMediaData() {
 
 function getImages(mediaData) {
   console.log("getImages function called");
-  const mainImages = new Set();
-  const variantImages = new Set();
+  const mainImages = [];
+  const variantImages = [];
+  let variants = {};
+  const defaultVariant = mediaData.landingAsinColor || Object.keys(mediaData.colorImages)[0];
 
   if (mediaData && mediaData.colorImages) {
-    const defaultColor = mediaData.landingAsinColor || Object.keys(mediaData.colorImages)[0];
-    
-    console.log("Default color (landingAsinColor):", defaultColor);
+    console.log("Default color (landingAsinColor):", defaultVariant);
     console.log("Color variants:", Object.keys(mediaData.colorImages));
 
-    Object.entries(mediaData.colorImages).forEach(([variant, images]) => {
-      console.log(`Processing variant: ${variant}`);
+    Object.keys(mediaData.colorImages).forEach(variant => {
+      variants[variant] = { name: variant, isDefault: variant === defaultVariant };
+      
+      const images = mediaData.colorImages[variant];
       if (Array.isArray(images)) {
         images.forEach(image => {
           const imageUrl = image.hiRes || image.large;
           if (imageUrl) {
-            if (variant === defaultColor) {
-              console.log(`Adding main image: ${imageUrl}`);
-              mainImages.add(imageUrl);
+            const imageObj = {
+              url: imageUrl,
+              alt: `${variant} Image`,
+              type: variant === defaultVariant ? 'main' : 'variant',
+              variant: variant
+            };
+            if (variant === defaultVariant) {
+              mainImages.push(imageObj);
             } else {
-              console.log(`Adding variant image: ${imageUrl}`);
-              variantImages.add(imageUrl);
+              variantImages.push(imageObj);
             }
           }
         });
@@ -74,21 +77,11 @@ function getImages(mediaData) {
     });
   }
 
-  console.log("Main images found:", mainImages.size);
-  console.log("Variant images found:", variantImages.size);
+  console.log("Main images found:", mainImages.length);
+  console.log("Variant images found:", variantImages.length);
+  console.log("Variants:", variants);
 
-  return {
-    mainImages: Array.from(mainImages).map(url => ({
-      url: url,
-      alt: 'Main Product Image',
-      type: 'main'
-    })),
-    variantImages: Array.from(variantImages).map(url => ({
-      url: url,
-      alt: 'Variant Image',
-      type: 'variant'
-    }))
-  };
+  return { mainImages, variantImages, variants, defaultVariant };
 }
 
 function getVideos(mediaData) {
@@ -125,15 +118,6 @@ function getVideos(mediaData) {
   return Array.from(videos);
 }
 
-// Helper function to check if a URL exists
-function urlExists(url) {
-  return new Promise((resolve) => {
-    fetch(url, { method: 'HEAD' })
-      .then(response => resolve(response.ok))
-      .catch(() => resolve(false));
-  });
-}
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("Message received in content script:", request);
   if (request.action === 'getMedia') {
@@ -146,7 +130,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     sendResponse({status: "Media loading initiated"});
   }
-  return true;  // Indicates that the response is sent asynchronously
+  return true;
 });
 
 chrome.runtime.sendMessage({action: "contentScriptFullyLoaded"});
