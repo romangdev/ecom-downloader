@@ -97,23 +97,27 @@ function getVideos(mediaData) {
 
   if (mediaData && mediaData.videos) {
     mediaData.videos.forEach(video => {
-      if (video.url) {
-        // Look for high-quality thumbnail options
-        const thumbnailUrl = video.slateUrl || // Highest quality option
-                             (video.thumb && video.thumb.large) ||
-                             (video.thumb && video.thumb.thumb) ||
-                             video.thumbUrl ||
-                             ''; // Fallback to empty string if no thumbnail found
+      console.log("Processing video:", video);
 
-        videos.add({
-          url: video.url,
-          thumbnailUrl: thumbnailUrl,
-          type: 'video'
-        });
+      const videoUrl = video.url;
+      const isHLS = videoUrl.includes('.m3u8');
 
-        console.log(`Video added: ${video.url}`);
-        console.log(`Thumbnail used: ${thumbnailUrl}`);
-      }
+      const thumbnailUrl = video.slateUrl || 
+                           (video.thumb && video.thumb.large) ||
+                           (video.thumb && video.thumb.thumb) ||
+                           video.thumbUrl ||
+                           '';
+
+      videos.add({
+        url: videoUrl,
+        thumbnailUrl: thumbnailUrl,
+        type: 'video',
+        isHLS: isHLS
+      });
+
+      console.log(`Video added: ${videoUrl}`);
+      console.log(`Is HLS: ${isHLS}`);
+      console.log(`Thumbnail used: ${thumbnailUrl}`);
     });
   }
 
@@ -121,7 +125,14 @@ function getVideos(mediaData) {
   return Array.from(videos);
 }
 
-// ... (rest of the code remains the same)
+// Helper function to check if a URL exists
+function urlExists(url) {
+  return new Promise((resolve) => {
+    fetch(url, { method: 'HEAD' })
+      .then(response => resolve(response.ok))
+      .catch(() => resolve(false));
+  });
+}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("Message received in content script:", request);

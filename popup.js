@@ -2,6 +2,13 @@ let mediaData;
 
 console.log("Popup script loaded");
 
+function logError(error) {
+  console.error('Error:', error);
+  if (error instanceof Error) {
+    console.error('Stack:', error.stack);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM content loaded");
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -114,6 +121,7 @@ function displayMedia(media) {
       // Store both video URL and thumbnail URL as data attributes
       div.dataset.videoUrl = item.url;
       div.dataset.thumbnailUrl = item.thumbnailUrl;
+      div.dataset.isHls = item.isHLS;
     }
   
     return div;
@@ -144,7 +152,8 @@ async function downloadAll() {
       const isVideo = mediaItem.querySelector('[style*="border-left: 12px solid white"]') !== null;
       return {
         url: isVideo ? mediaItem.dataset.videoUrl : mediaItem.querySelector('img').src,
-        type: isVideo ? 'video' : 'image'
+        type: isVideo ? 'video' : 'image',
+        isHLS: mediaItem.dataset.isHls === 'true'
       };
     });
 
@@ -153,58 +162,53 @@ async function downloadAll() {
     return;
   }
 
-  if (selectedItems.length === 1) {
-    // Download single file directly
-    const item = selectedItems[0];
-    const extension = item.type === 'video' ? 'mp4' : 'jpg';
-    const filename = `amazon_media.${extension}`;
-    
+  const zip = new JSZip();
+  const fetchPromises = selectedItems.map((item, index) => {
+    if (item.type === 'image') {
+      return fetch(item.url)
+        .then(response => response.blob())
+        .then(blob => {
+          zip.file(`amazon_image_${index + 1}.jpg`, blob);
+        });
+    } else if (item.type === 'video') {
+      if (item.isHLS) {
+        return fetch(item.url)
+          .then(response => response.text())
+          .then(content => {
+            zip.file(`amazon_video_${index + 1}.m3u8`, content);
+            // Add a README file with instructions
+            zip.file('README.txt', 'To play .m3u8 files, use VLC Media Player or ffmpeg to convert to MP4.');
+          });
+      } else {
+        return fetch(item.url)
+          .then(response => response.blob())
+          .then(blob => {
+            zip.file(`amazon_video_${index + 1}.mp4`, blob);
+          });
+      }
+    }
+  });
+
+  try {
+    await Promise.all(fetchPromises);
+    const content = await zip.generateAsync({type: "blob"});
+    const url = URL.createObjectURL(content);
     chrome.downloads.download({
-      url: item.url,
-      filename: filename,
+      url: url,
+      filename: "amazon_media.zip",
       saveAs: true
     }, (downloadId) => {
       if (chrome.runtime.lastError) {
         console.error(chrome.runtime.lastError);
-        alert('Error downloading file. Please try again.');
+        alert('Error downloading files. Please check the console for details.');
       } else {
-        console.log(`File downloaded with ID: ${downloadId}`);
+        console.log(`Zip file downloaded with ID: ${downloadId}`);
       }
+      URL.revokeObjectURL(url);
     });
-  } else {
-    // Download multiple files as zip
-    const zip = new JSZip();
-    const fetchPromises = selectedItems.map((item, index) => {
-      const extension = item.type === 'video' ? 'mp4' : 'jpg';
-      const filename = `amazon_media_${index + 1}.${extension}`;
-      return fetch(item.url)
-        .then(response => response.blob())
-        .then(blob => {
-          zip.file(filename, blob);
-        });
-    });
-
-    try {
-      await Promise.all(fetchPromises);
-      const content = await zip.generateAsync({type: "blob"});
-      const url = URL.createObjectURL(content);
-      chrome.downloads.download({
-        url: url,
-        filename: "amazon_media.zip",
-        saveAs: true
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          console.error(chrome.runtime.lastError);
-          alert('Error downloading files. Please try again.');
-        } else {
-          console.log(`Zip file downloaded with ID: ${downloadId}`);
-        }
-        URL.revokeObjectURL(url);
-      });
-    } catch (error) {
-      console.error('Error creating zip file:', error);
-      alert('Error creating zip file. Please try again.');
-    }
+  } catch (error) {
+    console.error('Error creating zip file:', error);
+    alert('Error creating zip file. Please check the console for details.');
   }
 }
 
