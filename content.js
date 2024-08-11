@@ -11,12 +11,12 @@ function getProductMedia() {
   const { mainImages, variantImages, variants, defaultVariant } = getImages(mediaData);
   const videos = getVideos(mediaData);
 
-  return { mainImages, variantImages, videos, defaultVariant };
+  return { mainImages, variantImages, videos, variants, defaultVariant };
 }
 
 function extractMediaData() {
   console.log("extractMediaData function called");
-  let mediaData = { colorImages: {}, videos: [], landingAsinColor: '' };
+  let mediaData = { colorImages: {}, videos: [], landingAsinColor: '', colorToAsin: {} };
 
   const scripts = document.querySelectorAll('script');
   
@@ -31,6 +31,7 @@ function extractMediaData() {
         mediaData.colorImages = parsedData.colorImages || {};
         mediaData.landingAsinColor = parsedData.landingAsinColor || '';
         mediaData.videos = parsedData.videos || [];
+        mediaData.colorToAsin = parsedData.colorToAsin || {};
       } catch (e) {
         console.error('Error parsing JSON data:', e);
       }
@@ -53,7 +54,8 @@ function getImages(mediaData) {
     console.log("Color variants:", Object.keys(mediaData.colorImages));
 
     Object.keys(mediaData.colorImages).forEach(variant => {
-      variants[variant] = { name: variant, isDefault: variant === defaultVariant };
+      const asin = mediaData.colorToAsin && mediaData.colorToAsin[variant] ? mediaData.colorToAsin[variant].asin : 'N/A';
+      variants[variant] = { name: variant, isDefault: variant === defaultVariant, asin: asin };
       
       const images = mediaData.colorImages[variant];
       if (Array.isArray(images)) {
@@ -105,17 +107,28 @@ function getVideos(mediaData) {
         url: videoUrl,
         thumbnailUrl: thumbnailUrl,
         type: 'video',
-        isHLS: isHLS
+        isHLS: isHLS,
+        title: video.title || 'Untitled',
+        duration: formatDuration(video.durationSeconds || 0)
       });
 
       console.log(`Video added: ${videoUrl}`);
       console.log(`Is HLS: ${isHLS}`);
       console.log(`Thumbnail used: ${thumbnailUrl}`);
+      console.log(`Title: ${video.title || 'Untitled'}`);
+      console.log(`Duration: ${formatDuration(video.durationSeconds || 0)}`);
     });
   }
 
   console.log("Videos found:", videos.size);
   return Array.from(videos);
+}
+
+function formatDuration(seconds) {
+  if (seconds === 0) return 'Unknown';
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

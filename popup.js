@@ -123,12 +123,18 @@ function displayImages(media) {
     const titleElem = document.createElement('div');
     titleElem.className = 'variationTitle';
     titleElem.innerHTML = `
-      ${variantName}
+      ${variantName} (${images.length})
       ${isDefault ? '<span class="defaultVariation"> (Default)</span>' : ''}
       <button class="selectAllVariant" data-variant="${variantName}">Select All</button>
     `;
     
+    const asinElem = document.createElement('div');
+    asinElem.className = 'variantAsin';
+    asinElem.textContent = `ASIN: ${mediaData.variants[variantName].asin || 'N/A'}`;
+    
     group.appendChild(titleElem);
+    group.appendChild(asinElem);
+  
 
     const mediaContainer = document.createElement('div');
     mediaContainer.className = 'mediaContainer';
@@ -186,13 +192,13 @@ function toggleVariantSelection(variantName, groupElement) {
   updateSelectionCount();
 }
 
-function createMediaElement(url, type, variant, thumbnailUrl, isHLS) {
+function createMediaElement(url, type, variant, thumbnailUrl, isHLS, title, duration) {
   const div = document.createElement('div');
   div.className = 'mediaItem';
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.checked = false; // Initially unchecked
+  checkbox.checked = false;
   checkbox.addEventListener('change', updateSelectionCount);
   div.appendChild(checkbox);
 
@@ -204,8 +210,15 @@ function createMediaElement(url, type, variant, thumbnailUrl, isHLS) {
   if (type === 'video') {
     const playIcon = document.createElement('div');
     playIcon.className = 'playIcon';
-    playIcon.textContent = '▶';
     div.appendChild(playIcon);
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'videoInfo';
+    infoDiv.innerHTML = `
+      <div class="videoTitle">${title}</div>
+      <div class="videoDuration">${duration}</div>
+    `;
+    div.appendChild(infoDiv);
 
     div.dataset.videoUrl = url;
     div.dataset.thumbnailUrl = thumbnailUrl;
@@ -306,7 +319,15 @@ function displayVideos(media) {
 
   if (media.videos && media.videos.length > 0) {
     media.videos.forEach(video => {
-      container.appendChild(createMediaElement(video.url, 'video', null, video.thumbnailUrl, video.isHLS));
+      container.appendChild(createMediaElement(
+        video.url,
+        'video',
+        null,
+        video.thumbnailUrl,
+        video.isHLS,
+        video.title,
+        video.duration
+      ));
     });
   } else {
     container.innerHTML = '<p>No videos found.</p>';
