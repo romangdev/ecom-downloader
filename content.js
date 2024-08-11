@@ -4,6 +4,8 @@ chrome.runtime.sendMessage({action: "contentScriptLoaded"}, function(response) {
   console.log("Content script loaded message sent");
 });
 
+// content.js
+
 function getProductMedia() {
   console.log("getProductMedia function called");
   const mediaData = extractMediaData();
@@ -16,7 +18,7 @@ function getProductMedia() {
 
 function extractMediaData() {
   console.log("extractMediaData function called");
-  let mediaData = { colorImages: {}, videos: [] };
+  let mediaData = { colorImages: {}, videos: [], landingAsinColor: '' };
 
   const scripts = document.querySelectorAll('script');
   
@@ -30,6 +32,7 @@ function extractMediaData() {
         const jsonStr = match[1].replace(/\\'/g, "'").replace(/\\"/g, '"');
         const parsedData = JSON.parse(jsonStr);
         mediaData.colorImages = parsedData.colorImages || {};
+        mediaData.landingAsinColor = parsedData.landingAsinColor || '';
       } catch (e) {
         console.error('Error parsing colorImages:', e);
       }
@@ -60,14 +63,22 @@ function getImages(mediaData) {
   const variantImages = new Set();
 
   if (mediaData && mediaData.colorImages) {
+    const defaultColor = mediaData.landingAsinColor || Object.keys(mediaData.colorImages)[0];
+    
+    console.log("Default color (landingAsinColor):", defaultColor);
+    console.log("Color variants:", Object.keys(mediaData.colorImages));
+
     Object.entries(mediaData.colorImages).forEach(([variant, images]) => {
+      console.log(`Processing variant: ${variant}`);
       if (Array.isArray(images)) {
         images.forEach(image => {
           const imageUrl = image.hiRes || image.large;
           if (imageUrl) {
-            if (variant === 'initial') {
+            if (variant === defaultColor) {
+              console.log(`Adding main image: ${imageUrl}`);
               mainImages.add(imageUrl);
             } else {
+              console.log(`Adding variant image: ${imageUrl}`);
               variantImages.add(imageUrl);
             }
           }
@@ -112,6 +123,8 @@ function getVideos(mediaData) {
   console.log("Videos found:", videos.size);
   return Array.from(videos);
 }
+
+// ... (rest of the code remains the same)
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("Message received in content script:", request);
