@@ -22,10 +22,10 @@ function extractMediaData() {
 
   const scripts = document.querySelectorAll('script');
   
-  // Extract colorImages data
-  const colorImagesScript = Array.from(scripts).find(script => script.textContent.includes('var obj = jQuery.parseJSON'));
-  if (colorImagesScript) {
-    const scriptContent = colorImagesScript.textContent;
+  // Extract colorImages and video data
+  const dataScript = Array.from(scripts).find(script => script.textContent.includes('var obj = jQuery.parseJSON'));
+  if (dataScript) {
+    const scriptContent = dataScript.textContent;
     const match = scriptContent.match(/var obj = jQuery\.parseJSON\('(.+?)'\);/);
     if (match) {
       try {
@@ -33,22 +33,9 @@ function extractMediaData() {
         const parsedData = JSON.parse(jsonStr);
         mediaData.colorImages = parsedData.colorImages || {};
         mediaData.landingAsinColor = parsedData.landingAsinColor || '';
+        mediaData.videos = parsedData.videos || [];
       } catch (e) {
-        console.error('Error parsing colorImages:', e);
-      }
-    }
-  }
-
-  // Extract videos data
-  const videosScript = Array.from(scripts).find(script => script.textContent.includes('"videos":'));
-  if (videosScript) {
-    const scriptContent = videosScript.textContent;
-    const match = scriptContent.match(/"videos":\s*(\[.+?\])/);
-    if (match) {
-      try {
-        mediaData.videos = JSON.parse(match[1].replace(/\\"/g, '"').replace(/\\'/g, "'"));
-      } catch (e) {
-        console.error('Error parsing videos:', e);
+        console.error('Error parsing JSON data:', e);
       }
     }
   }
@@ -111,11 +98,21 @@ function getVideos(mediaData) {
   if (mediaData && mediaData.videos) {
     mediaData.videos.forEach(video => {
       if (video.url) {
+        // Look for high-quality thumbnail options
+        const thumbnailUrl = video.slateUrl || // Highest quality option
+                             (video.thumb && video.thumb.large) ||
+                             (video.thumb && video.thumb.thumb) ||
+                             video.thumbUrl ||
+                             ''; // Fallback to empty string if no thumbnail found
+
         videos.add({
           url: video.url,
-          thumbnailUrl: video.thumbUrl || video.slateUrl || '',
+          thumbnailUrl: thumbnailUrl,
           type: 'video'
         });
+
+        console.log(`Video added: ${video.url}`);
+        console.log(`Thumbnail used: ${thumbnailUrl}`);
       }
     });
   }
