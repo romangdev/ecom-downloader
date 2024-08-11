@@ -3,6 +3,7 @@ let mediaData;
 document.addEventListener('DOMContentLoaded', function() {
   setupTabNavigation();
   initializeExtension();
+  setupSelectionButtons();
 });
 
 function setupTabNavigation() {
@@ -51,25 +52,58 @@ function initializeExtension() {
     }
   });
 
-  document.getElementById('downloadAll').addEventListener('click', downloadAll);
+  // Move these listeners here to ensure the elements exist
+  document.getElementById('downloadSelected').addEventListener('click', downloadSelected);
   document.getElementById('exportCSV').addEventListener('click', exportToCSV);
 }
 
-function displayMedia(media) {
-  try {
-    console.log('Received media data:', JSON.stringify(media, null, 2));
-    if (!media || typeof media !== 'object') {
-      throw new Error('Invalid media data received');
-    }
-    displayImages(media);
-    displayVideos(media);
-    updateMediaCounts(media);
-  } catch (error) {
-    console.error('Error displaying media:', error);
-    document.getElementById('imageVariations').innerHTML = '<p>Error loading images. Please try again.</p>';
-    document.getElementById('videoList').innerHTML = '<p>Error loading videos. Please try again.</p>';
-    document.getElementById('imageCount').textContent = '0';
-    document.getElementById('videoCount').textContent = '0';
+function setupSelectionButtons() {
+  const selectAllMedia = document.getElementById('selectAllMedia');
+  const selectAllImages = document.getElementById('selectAllImages');
+  const selectAllVideos = document.getElementById('selectAllVideos');
+
+  if (selectAllMedia) selectAllMedia.addEventListener('click', () => toggleSelection('all'));
+  if (selectAllImages) selectAllImages.addEventListener('click', () => toggleSelection('images'));
+  if (selectAllVideos) selectAllVideos.addEventListener('click', () => toggleSelection('videos'));
+}
+
+function toggleSelection(type) {
+  const imagesChecked = areAllSelected('#imagesContent .mediaItem input');
+  const videosChecked = areAllSelected('#videosContent .mediaItem input');
+  
+  let selector;
+  switch(type) {
+    case 'all':
+      selector = '.mediaItem input';
+      break;
+    case 'images':
+      selector = '#imagesContent .mediaItem input';
+      break;
+    case 'videos':
+      selector = '#videosContent .mediaItem input';
+      break;
+  }
+  
+  const shouldCheck = type === 'all' ? !(imagesChecked && videosChecked) :
+                      type === 'images' ? !imagesChecked : !videosChecked;
+  
+  document.querySelectorAll(selector).forEach(checkbox => {
+    checkbox.checked = shouldCheck;
+  });
+  
+  updateSelectionCount();
+}
+
+function areAllSelected(selector) {
+  const checkboxes = document.querySelectorAll(selector);
+  return checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+}
+
+function updateSelectionCount() {
+  const count = document.querySelectorAll('.mediaItem input:checked').length;
+  const selectionCountElement = document.getElementById('selectionCount');
+  if (selectionCountElement) {
+    selectionCountElement.textContent = `${count} selected`;
   }
 }
 
@@ -88,23 +122,28 @@ function displayImages(media) {
     
     const titleElem = document.createElement('div');
     titleElem.className = 'variationTitle';
-    titleElem.textContent = variantName;
-    
-    if (isDefault) {
-      const defaultSpan = document.createElement('span');
-      defaultSpan.className = 'defaultVariation';
-      defaultSpan.textContent = ' (Default)';
-      titleElem.appendChild(defaultSpan);
-    }
+    titleElem.innerHTML = `
+      ${variantName}
+      ${isDefault ? '<span class="defaultVariation"> (Default)</span>' : ''}
+      <button class="selectAllVariant" data-variant="${variantName}">Select All</button>
+    `;
     
     group.appendChild(titleElem);
+
+    const mediaContainer = document.createElement('div');
+    mediaContainer.className = 'mediaContainer';
 
     images.forEach(image => {
       const imageUrl = image.url;
       if (imageUrl && typeof imageUrl === 'string' && !imageUrl.includes('x-spritesheet')) {
-        group.appendChild(createMediaElement(imageUrl, 'image', variantName));
+        mediaContainer.appendChild(createMediaElement(imageUrl, 'image', variantName));
       }
     });
+
+    group.appendChild(mediaContainer);
+
+    const selectAllBtn = group.querySelector('.selectAllVariant');
+    selectAllBtn.addEventListener('click', () => toggleVariantSelection(variantName, group));
 
     return group;
   }
@@ -135,19 +174,16 @@ function displayImages(media) {
   if (container.children.length === 0) {
     container.innerHTML = '<p>No valid images found.</p>';
   }
+
+  updateSelectionCount();
 }
 
-function displayVideos(media) {
-  const container = document.getElementById('videoList');
-  container.innerHTML = '';
-
-  if (media.videos && media.videos.length > 0) {
-    media.videos.forEach(video => {
-      container.appendChild(createMediaElement(video.url, 'video', null, video.thumbnailUrl, video.isHLS));
-    });
-  } else {
-    container.innerHTML = '<p>No videos found.</p>';
-  }
+function toggleVariantSelection(variantName, groupElement) {
+  const checkboxes = groupElement.querySelectorAll('.mediaItem input');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  
+  checkboxes.forEach(cb => cb.checked = !allChecked);
+  updateSelectionCount();
 }
 
 function createMediaElement(url, type, variant, thumbnailUrl, isHLS) {
@@ -156,7 +192,8 @@ function createMediaElement(url, type, variant, thumbnailUrl, isHLS) {
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.checked = true;
+  checkbox.checked = false; // Initially unchecked
+  checkbox.addEventListener('change', updateSelectionCount);
   div.appendChild(checkbox);
 
   const img = document.createElement('img');
@@ -178,29 +215,8 @@ function createMediaElement(url, type, variant, thumbnailUrl, isHLS) {
   return div;
 }
 
-function updateMediaCounts(media) {
-  let imageCount = 0;
-  if (media.mainImages && Array.isArray(media.mainImages)) {
-    imageCount += media.mainImages.length;
-  }
-  if (media.variantImages && Array.isArray(media.variantImages)) {
-    imageCount += media.variantImages.length;
-  }
-  
-  document.getElementById('imageCount').textContent = imageCount;
-  
-  let videoCount = 0;
-  if (media.videos && Array.isArray(media.videos)) {
-    videoCount = media.videos.length;
-  }
-  document.getElementById('videoCount').textContent = videoCount;
-}
-
-function downloadAll() {
-  const selectedItems = [
-    ...document.querySelectorAll('#imagesContent .mediaItem input:checked'),
-    ...document.querySelectorAll('#videosContent .mediaItem input:checked')
-  ].map(checkbox => checkbox.closest('.mediaItem'));
+function downloadSelected() {
+  const selectedItems = document.querySelectorAll('.mediaItem input:checked');
 
   if (selectedItems.length === 0) {
     alert('Please select at least one item to download.');
@@ -208,7 +224,8 @@ function downloadAll() {
   }
 
   const zip = new JSZip();
-  const fetchPromises = selectedItems.map((item, index) => {
+  const fetchPromises = Array.from(selectedItems).map((checkbox, index) => {
+    const item = checkbox.closest('.mediaItem');
     const isVideo = item.dataset.videoUrl !== undefined;
     const url = isVideo ? item.dataset.videoUrl : item.querySelector('img').src;
     const isHLS = isVideo && item.dataset.isHls === 'true';
@@ -247,10 +264,7 @@ function downloadAll() {
 }
 
 function exportToCSV() {
-  const selectedItems = [
-    ...document.querySelectorAll('#imagesContent .mediaItem input:checked'),
-    ...document.querySelectorAll('#videosContent .mediaItem input:checked')
-  ].map(checkbox => checkbox.closest('.mediaItem'));
+  const selectedItems = document.querySelectorAll('.mediaItem input:checked');
 
   if (selectedItems.length === 0) {
     alert('Please select at least one item to export.');
@@ -259,7 +273,8 @@ function exportToCSV() {
 
   const csvContent = "data:text/csv;charset=utf-8," 
     + "URL,Type,Variant\n"
-    + selectedItems.map(item => {
+    + Array.from(selectedItems).map(checkbox => {
+      const item = checkbox.closest('.mediaItem');
       const isVideo = item.dataset.videoUrl !== undefined;
       const url = isVideo ? item.dataset.videoUrl : item.querySelector('img').src;
       const type = isVideo ? 'video' : 'image';
@@ -280,6 +295,57 @@ function displayError(message) {
   document.getElementById('loadingIndicator').style.display = 'none';
   const container = document.getElementById('contentContainer');
   container.innerHTML = `<p style="color: red;">${message}</p>`;
-  document.getElementById('downloadAll').disabled = true;
+  document.getElementById('downloadSelected').disabled = true;
   document.getElementById('exportCSV').disabled = true;
+}
+
+// Additional function to display videos (if not already implemented)
+function displayVideos(media) {
+  const container = document.getElementById('videoList');
+  container.innerHTML = '';
+
+  if (media.videos && media.videos.length > 0) {
+    media.videos.forEach(video => {
+      container.appendChild(createMediaElement(video.url, 'video', null, video.thumbnailUrl, video.isHLS));
+    });
+  } else {
+    container.innerHTML = '<p>No videos found.</p>';
+  }
+}
+
+// Function to display all media
+function displayMedia(media) {
+  try {
+    console.log('Received media data:', JSON.stringify(media, null, 2));
+    if (!media || typeof media !== 'object') {
+      throw new Error('Invalid media data received');
+    }
+    displayImages(media);
+    displayVideos(media);
+    updateMediaCounts(media);
+  } catch (error) {
+    console.error('Error displaying media:', error);
+    document.getElementById('imageVariations').innerHTML = '<p>Error loading images. Please try again.</p>';
+    document.getElementById('videoList').innerHTML = '<p>Error loading videos. Please try again.</p>';
+    document.getElementById('imageCount').textContent = '0';
+    document.getElementById('videoCount').textContent = '0';
+  }
+}
+
+function updateMediaCounts(media) {
+  let imageCount = 0;
+  if (media.mainImages && Array.isArray(media.mainImages)) {
+    imageCount += media.mainImages.length;
+  }
+  if (media.variantImages && Array.isArray(media.variantImages)) {
+    imageCount += media.variantImages.length;
+  }
+  
+  document.getElementById('imageCount').textContent = imageCount;
+  
+  let videoCount = 0;
+  if (media.videos && Array.isArray(media.videos)) {
+    videoCount = media.videos.length;
+  }
+  document.getElementById('videoCount').textContent = videoCount;
 }

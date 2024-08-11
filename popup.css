@@ -4,14 +4,32 @@ body {
   font-family: Arial, sans-serif;
 }
 
-h1 {
-  font-size: 18px;
-  margin-bottom: 10px;
+#selectionBar {
+  position: sticky;
+  top: 0;
+  background-color: #f8f8f8;
+  padding: 10px 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#selectionBar button {
+  margin-right: 5px;
+  margin-bottom: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+#selectionCount {
+  font-weight: bold;
 }
 
 #tabContainer {
   display: flex;
-  margin-bottom: 10px;
+  margin: 10px 0;
 }
 
 .tabButton {
@@ -44,6 +62,14 @@ h1 {
 .variationTitle {
   font-weight: bold;
   margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selectAllVariant {
+  font-size: 12px;
+  padding: 2px 5px;
 }
 
 .defaultVariation {
@@ -51,8 +77,28 @@ h1 {
   font-size: 0.9em;
 }
 
+.mediaContainer {
+  display: flex;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 10px;
+}
+
+.mediaContainer::-webkit-scrollbar {
+  height: 8px;
+}
+
+.mediaContainer::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 4px;
+}
+
+.mediaContainer::-webkit-scrollbar-track {
+  background-color: #f0f0f0;
+}
+
 .mediaItem {
-  display: inline-block;
+  flex: 0 0 auto;
   margin: 5px;
   text-align: center;
 }

@@ -1,16 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Amazon Media Downloader</title>
   <link rel="stylesheet" type="text/css" href="popup.css">
 </head>
 <body>
-  <h1>Amazon Media Downloader</h1>
   <div id="loadingIndicator" class="loading">Loading media...</div>
+  
+  <div id="selectionBar">
+    <button id="selectAllMedia">Select All Media</button>
+    <button id="selectAllImages">Select All Images</button>
+    <button id="selectAllVideos">Select All Videos</button>
+    <span id="selectionCount">0 selected</span>
+  </div>
+
   <div id="tabContainer">
     <button id="imagesTab" class="tabButton active">Images (<span id="imageCount">0</span>)</button>
     <button id="videosTab" class="tabButton">Videos (<span id="videoCount">0</span>)</button>
   </div>
+
   <div id="contentContainer">
     <div id="imagesContent" class="tabContent active">
       <div id="imageVariations"></div>
@@ -19,10 +26,12 @@
       <div id="videoList"></div>
     </div>
   </div>
+
   <div id="actionButtons">
     <button id="exportCSV">Export Selected to CSV</button>
-    <button id="downloadAll">Download Selected</button>
+    <button id="downloadSelected">Download Selected</button>
   </div>
+
   <script src="jszip.min.js"></script>
   <script src="popup.js"></script>
 </body>
