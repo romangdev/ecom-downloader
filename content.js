@@ -1,5 +1,3 @@
-// content.js
-
 console.log("Content script starting to load");
 
 chrome.runtime.sendMessage({action: "contentScriptLoaded"}, function(response) {
@@ -10,14 +8,11 @@ function getProductMedia() {
   console.log("getProductMedia function called");
   const mediaData = extractMediaData();
   console.log("Extracted media data:", mediaData);
-  const images = getHighQualityImages(mediaData);
+  const { mainImages, variantImages } = getImages(mediaData);
   const videos = getVideos(mediaData);
-  const variantImages = getVariantImages(mediaData);
 
-  return { images, videos, variantImages };
+  return { mainImages, variantImages, videos };
 }
-
-// content.js
 
 function extractMediaData() {
   console.log("extractMediaData function called");
@@ -59,56 +54,43 @@ function extractMediaData() {
   return mediaData;
 }
 
-function getHighQualityImages(mediaData) {
-  console.log("getHighQualityImages function called");
-  const images = new Set();
-
-  if (mediaData && mediaData.colorImages) {
-    Object.values(mediaData.colorImages).forEach(variant => {
-      if (Array.isArray(variant)) {
-        variant.forEach(image => {
-          if (image.hiRes) {
-            images.add(image.hiRes);
-          } else if (image.large) {
-            images.add(image.large);
-          }
-        });
-      }
-    });
-  }
-
-  console.log("High quality images found:", images.size);
-  return Array.from(images).map(url => ({
-    url: url,
-    alt: 'Product Image',
-    type: 'image'
-  }));
-}
-
-function getVariantImages(mediaData) {
-  console.log("getVariantImages function called");
+function getImages(mediaData) {
+  console.log("getImages function called");
+  const mainImages = new Set();
   const variantImages = new Set();
 
   if (mediaData && mediaData.colorImages) {
     Object.entries(mediaData.colorImages).forEach(([variant, images]) => {
-      if (variant !== 'initial' && Array.isArray(images)) {
+      if (Array.isArray(images)) {
         images.forEach(image => {
-          if (image.hiRes) {
-            variantImages.add(image.hiRes);
-          } else if (image.large) {
-            variantImages.add(image.large);
+          const imageUrl = image.hiRes || image.large;
+          if (imageUrl) {
+            if (variant === 'initial') {
+              mainImages.add(imageUrl);
+            } else {
+              variantImages.add(imageUrl);
+            }
           }
         });
       }
     });
   }
 
+  console.log("Main images found:", mainImages.size);
   console.log("Variant images found:", variantImages.size);
-  return Array.from(variantImages).map(url => ({
-    url: url,
-    alt: 'Variant Image',
-    type: 'variant'
-  }));
+
+  return {
+    mainImages: Array.from(mainImages).map(url => ({
+      url: url,
+      alt: 'Main Product Image',
+      type: 'main'
+    })),
+    variantImages: Array.from(variantImages).map(url => ({
+      url: url,
+      alt: 'Variant Image',
+      type: 'variant'
+    }))
+  };
 }
 
 function getVideos(mediaData) {

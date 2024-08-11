@@ -1,5 +1,3 @@
-// popup.js
-
 let mediaData;
 
 console.log("Popup script loaded");
@@ -121,7 +119,7 @@ function displayMedia(media) {
     return div;
   }
 
-  const allMedia = [...media.images, ...media.videos, ...media.variantImages];
+  const allMedia = [...media.mainImages, ...media.variantImages, ...media.videos];
   allMedia.forEach(item => {
     if (item.url && !item.url.includes('x-spritesheet')) {
       container.appendChild(createMediaElement(item));
@@ -132,6 +130,9 @@ function displayMedia(media) {
     displayError("No valid media found on this page.");
   } else {
     console.log(`Total media elements displayed: ${container.children.length}`);
+    console.log(`Main images: ${media.mainImages.length}`);
+    console.log(`Variant images: ${media.variantImages.length}`);
+    console.log(`Videos: ${media.videos.length}`);
   }
 }
 
