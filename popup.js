@@ -1,3 +1,5 @@
+// popup.js
+
 let mediaData;
 
 console.log("Popup script loaded");
@@ -132,6 +134,7 @@ function displayMedia(media) {
     console.log(`Total media elements displayed: ${container.children.length}`);
   }
 }
+
 
 async function downloadAll() {
   const selectedItems = Array.from(document.querySelectorAll('.media-item input:checked'))

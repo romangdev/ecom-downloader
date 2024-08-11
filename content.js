@@ -1,120 +1,109 @@
+// content.js
+
 console.log("Content script starting to load");
 
 chrome.runtime.sendMessage({action: "contentScriptLoaded"}, function(response) {
   console.log("Content script loaded message sent");
 });
 
-async function getProductMedia() {
-  try {
-    await loadAllVariantImagesAndVideos();
-    const images = getHighQualityImages();
-    const videos = getVideos();
-    const variantImages = getVariantImages();
+function getProductMedia() {
+  console.log("getProductMedia function called");
+  const mediaData = extractMediaData();
+  console.log("Extracted media data:", mediaData);
+  const images = getHighQualityImages(mediaData);
+  const videos = getVideos(mediaData);
+  const variantImages = getVariantImages(mediaData);
 
-    chrome.runtime.sendMessage({
-      action: "mediaLoaded",
-      data: { images, videos, variantImages }
-    });
-  } catch (error) {
-    console.error('Error getting product media:', error);
-    chrome.runtime.sendMessage({
-      action: "mediaLoaded",
-      data: { images: [], videos: [], variantImages: [] }
-    });
-  }
+  return { images, videos, variantImages };
 }
 
-async function loadAllVariantImagesAndVideos() {
-  const variantThumbs = document.querySelectorAll('.imageThumbnail, .videoThumbnail');
-  for (let thumb of variantThumbs) {
-    await new Promise(resolve => {
-      thumb.click();
-      setTimeout(resolve, 500); // Reduced wait time to 500ms
-    });
-  }
-}
+// content.js
 
-function getHighQualityImages() {
-  const imageUrls = new Set();
+function extractMediaData() {
+  console.log("extractMediaData function called");
+  let mediaData = { colorImages: {}, videos: [] };
+
+  const scripts = document.querySelectorAll('script');
   
-  function getHighResUrl(img) {
-    if (img.dataset.oldHires) return img.dataset.oldHires;
-    if (img.dataset.aPlus) return img.dataset.aPlus;
-    
-    if (img.dataset.aLargeImage) {
+  // Extract colorImages data
+  const colorImagesScript = Array.from(scripts).find(script => script.textContent.includes('var obj = jQuery.parseJSON'));
+  if (colorImagesScript) {
+    const scriptContent = colorImagesScript.textContent;
+    const match = scriptContent.match(/var obj = jQuery\.parseJSON\('(.+?)'\);/);
+    if (match) {
       try {
-        const largeImage = JSON.parse(img.dataset.aLargeImage);
-        if (largeImage.url) return largeImage.url;
+        const jsonStr = match[1].replace(/\\'/g, "'").replace(/\\"/g, '"');
+        const parsedData = JSON.parse(jsonStr);
+        mediaData.colorImages = parsedData.colorImages || {};
       } catch (e) {
-        console.error('Error parsing a-large-image:', e);
+        console.error('Error parsing colorImages:', e);
       }
     }
-    
-    if (img.srcset) {
-      const srcset = img.srcset.split(',').map(src => {
-        const [url, width] = src.trim().split(' ');
-        return { url, width: parseInt(width) };
-      });
-      const highestRes = srcset.reduce((prev, current) => 
-        (current.width > prev.width) ? current : prev
-      );
-      return highestRes.url;
-    }
-    
-    return img.src;
   }
 
-  document.querySelectorAll('#altImages img, #main-image-container img, #imageBlock img').forEach(img => {
-    const highResUrl = getHighResUrl(img);
-    if (highResUrl && !highResUrl.includes('x-spritesheet') && isHighQualityImage(highResUrl)) {
-      imageUrls.add(highResUrl);
+  // Extract videos data
+  const videosScript = Array.from(scripts).find(script => script.textContent.includes('"videos":'));
+  if (videosScript) {
+    const scriptContent = videosScript.textContent;
+    const match = scriptContent.match(/"videos":\s*(\[.+?\])/);
+    if (match) {
+      try {
+        mediaData.videos = JSON.parse(match[1].replace(/\\"/g, '"').replace(/\\'/g, "'"));
+      } catch (e) {
+        console.error('Error parsing videos:', e);
+      }
     }
-  });
+  }
 
-  return Array.from(imageUrls).map(url => ({
+  console.log("Extracted mediaData:", mediaData);
+  return mediaData;
+}
+
+function getHighQualityImages(mediaData) {
+  console.log("getHighQualityImages function called");
+  const images = new Set();
+
+  if (mediaData && mediaData.colorImages) {
+    Object.values(mediaData.colorImages).forEach(variant => {
+      if (Array.isArray(variant)) {
+        variant.forEach(image => {
+          if (image.hiRes) {
+            images.add(image.hiRes);
+          } else if (image.large) {
+            images.add(image.large);
+          }
+        });
+      }
+    });
+  }
+
+  console.log("High quality images found:", images.size);
+  return Array.from(images).map(url => ({
     url: url,
     alt: 'Product Image',
     type: 'image'
   }));
 }
 
-function getVariantImages() {
+function getVariantImages(mediaData) {
+  console.log("getVariantImages function called");
   const variantImages = new Set();
-  
-  function getHighResUrl(img) {
-    if (img.dataset.oldHires) return img.dataset.oldHires;
-    if (img.dataset.aPlus) return img.dataset.aPlus;
-    
-    if (img.dataset.aLargeImage) {
-      try {
-        const largeImage = JSON.parse(img.dataset.aLargeImage);
-        if (largeImage.url) return largeImage.url;
-      } catch (e) {
-        console.error('Error parsing a-large-image:', e);
+
+  if (mediaData && mediaData.colorImages) {
+    Object.entries(mediaData.colorImages).forEach(([variant, images]) => {
+      if (variant !== 'initial' && Array.isArray(images)) {
+        images.forEach(image => {
+          if (image.hiRes) {
+            variantImages.add(image.hiRes);
+          } else if (image.large) {
+            variantImages.add(image.large);
+          }
+        });
       }
-    }
-    
-    if (img.srcset) {
-      const srcset = img.srcset.split(',').map(src => {
-        const [url, width] = src.trim().split(' ');
-        return { url, width: parseInt(width) };
-      });
-      const highestRes = srcset.reduce((prev, current) => 
-        (current.width > prev.width) ? current : prev
-      );
-      return highestRes.url;
-    }
-    
-    return img.src;
+    });
   }
 
-  document.querySelectorAll('.twisterImageDiv img, #variation_color_name img').forEach(img => {
-    const highResUrl = getHighResUrl(img);
-    if (highResUrl && !highResUrl.includes('x-spritesheet') && isHighQualityImage(highResUrl)) {
-      variantImages.add(highResUrl);
-    }
-  });
-
+  console.log("Variant images found:", variantImages.size);
   return Array.from(variantImages).map(url => ({
     url: url,
     alt: 'Variant Image',
@@ -122,77 +111,36 @@ function getVariantImages() {
   }));
 }
 
-function isHighQualityImage(url) {
-  // Check if the URL contains indicators of high quality
-  const highQualityIndicators = ['_AC_SL1500_', '_AC_SX679_', '_AC_UL1500_'];
-  return highQualityIndicators.some(indicator => url.includes(indicator));
-}
+function getVideos(mediaData) {
+  console.log("getVideos function called");
+  const videos = new Set();
 
-function getVideos() {
-  const videos = [];
-  
-  // Check for video in the main media container
-  const mainVideoElement = document.querySelector('#main-video-container video');
-  if (mainVideoElement && mainVideoElement.src) {
-    const thumbnailUrl = mainVideoElement.poster || getVideoThumbnail(mainVideoElement);
-    videos.push({
-      url: mainVideoElement.src,
-      thumbnailUrl: thumbnailUrl,
-      type: 'video'
-    });
-  }
-  
-  // Check for videos in the variant selector
-  const videoElements = document.querySelectorAll('.videoThumbnail');
-  videoElements.forEach(element => {
-    const dataUrl = element.getAttribute('data-url');
-    const thumbnailUrl = element.querySelector('img')?.src || '';
-    if (dataUrl) {
-      videos.push({
-        url: dataUrl,
-        thumbnailUrl: thumbnailUrl,
-        type: 'video'
-      });
-    }
-  });
-
-  // Check for videos in script tags
-  const scriptElements = document.querySelectorAll('script[type="text/template"]');
-  scriptElements.forEach(script => {
-    try {
-      const content = JSON.parse(script.textContent);
-      if (content.videos && Array.isArray(content.videos)) {
-        content.videos.forEach(video => {
-          if (video.url) {
-            videos.push({
-              url: video.url,
-              thumbnailUrl: video.thumbnailUrl || '',
-              type: 'video'
-            });
-          }
+  if (mediaData && mediaData.videos) {
+    mediaData.videos.forEach(video => {
+      if (video.url) {
+        videos.add({
+          url: video.url,
+          thumbnailUrl: video.thumbUrl || video.slateUrl || '',
+          type: 'video'
         });
       }
-    } catch (e) {
-      console.error('Error parsing video script:', e);
-    }
-  });
+    });
+  }
 
-  return videos;
-}
-
-function getVideoThumbnail(videoElement) {
-  const canvas = document.createElement('canvas');
-  canvas.width = videoElement.videoWidth;
-  canvas.height = videoElement.videoHeight;
-  canvas.getContext('2d').drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg');
+  console.log("Videos found:", videos.size);
+  return Array.from(videos);
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("Message received in content script:", request);
   if (request.action === 'getMedia') {
     console.log("Getting media data");
-    getProductMedia();
+    const mediaData = getProductMedia();
+    console.log("Media data to be sent:", mediaData);
+    chrome.runtime.sendMessage({
+      action: "mediaLoaded",
+      data: mediaData
+    });
     sendResponse({status: "Media loading initiated"});
   }
   return true;  // Indicates that the response is sent asynchronously
