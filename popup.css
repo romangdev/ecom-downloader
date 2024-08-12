@@ -9,6 +9,13 @@ h1 {
   margin-bottom: 10px;
 }
 
+#loadingIndicator {
+  text-align: center;
+  padding: 20px;
+  font-style: italic;
+  color: #666;
+}
+
 #selectionBar {
   position: sticky;
   top: 0;
@@ -108,11 +115,24 @@ h1 {
   background-color: #f0f0f0;
 }
 
+.imageGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
 .mediaItem {
-  flex: 0 0 auto;
   margin: 5px;
   text-align: center;
   position: relative;
+}
+
+.mediaContainer .mediaItem {
+  flex: 0 0 auto;
+}
+
+.imageGrid .mediaItem {
+  width: 100%;
 }
 
 .mediaItem img {
@@ -121,20 +141,10 @@ h1 {
   object-fit: cover;
 }
 
-#videoList {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-#videoList .mediaItem {
-  width: 100%;
-}
-
-#videoList .mediaItem img {
+.imageGrid .mediaItem img {
   width: 100%;
   height: auto;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
 }
 
@@ -176,6 +186,23 @@ h1 {
   float: right;
 }
 
+#videoList {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+#videoList .mediaItem {
+  width: 100%;
+}
+
+#videoList .mediaItem img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
 #actionButtons {
   margin-top: 10px;
   display: flex;
@@ -185,32 +212,19 @@ h1 {
 #actionButtons button {
   flex: 1;
   margin: 0 5px;
-}
-
-.loading {
-  text-align: center;
-  padding: 20px;
-  font-style: italic;
-  color: #666;
-}
-
-.videoInfo {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.7);
+  padding: 8px;
+  background-color: #4CAF50;
   color: white;
-  padding: 5px;
-  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
 }
 
-.videoTitle {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+#actionButtons button:hover {
+  background-color: #45a049;
 }
 
-.videoDuration {
-  float: right;
+#actionButtons button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }

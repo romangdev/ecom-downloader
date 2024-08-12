@@ -52,7 +52,6 @@ function initializeExtension() {
     }
   });
 
-  // Move these listeners here to ensure the elements exist
   document.getElementById('downloadSelected').addEventListener('click', downloadSelected);
   document.getElementById('exportCSV').addEventListener('click', exportToCSV);
 }
@@ -107,6 +106,24 @@ function updateSelectionCount() {
   }
 }
 
+function displayMedia(media) {
+  try {
+    console.log('Received media data:', JSON.stringify(media, null, 2));
+    if (!media || typeof media !== 'object') {
+      throw new Error('Invalid media data received');
+    }
+    displayImages(media);
+    displayVideos(media);
+    updateMediaCounts(media);
+  } catch (error) {
+    console.error('Error displaying media:', error);
+    document.getElementById('imageVariations').innerHTML = '<p>Error loading images. Please try again.</p>';
+    document.getElementById('videoList').innerHTML = '<p>Error loading videos. Please try again.</p>';
+    document.getElementById('imageCount').textContent = '0';
+    document.getElementById('videoCount').textContent = '0';
+  }
+}
+
 function displayImages(media) {
   const container = document.getElementById('imageVariations');
   container.innerHTML = '';
@@ -116,65 +133,33 @@ function displayImages(media) {
     return;
   }
 
-  function createImageGroup(variantName, images, isDefault = false) {
-    const group = document.createElement('div');
-    group.className = 'variationGroup';
-    
-    const titleElem = document.createElement('div');
-    titleElem.className = 'variationTitle';
-    titleElem.innerHTML = `
-      ${variantName} (${images.length})
-      ${isDefault ? '<span class="defaultVariation"> (Default)</span>' : ''}
-      <button class="selectAllVariant" data-variant="${variantName}">Select All</button>
-    `;
-    
-    const asinElem = document.createElement('div');
-    asinElem.className = 'variantAsin';
-    asinElem.textContent = `ASIN: ${mediaData.variants[variantName].asin || 'N/A'}`;
-    
-    group.appendChild(titleElem);
-    group.appendChild(asinElem);
-  
+  const hasMultipleVariants = media.variantImages && media.variantImages.length > 0;
 
-    const mediaContainer = document.createElement('div');
-    mediaContainer.className = 'mediaContainer';
+  if (!hasMultipleVariants) {
+    // Display main images in a grid for single variant
+    const group = createImageGroup(media.defaultVariant, media.mainImages, true, false);
+    container.appendChild(group);
+  } else {
+    // Display variants with horizontal scroll
+    if (media.mainImages && media.mainImages.length > 0) {
+      container.appendChild(createImageGroup(media.defaultVariant, media.mainImages, true, true));
+    }
 
-    images.forEach(image => {
-      const imageUrl = image.url;
-      if (imageUrl && typeof imageUrl === 'string' && !imageUrl.includes('x-spritesheet')) {
-        mediaContainer.appendChild(createMediaElement(imageUrl, 'image', variantName));
-      }
-    });
+    if (media.variantImages && media.variantImages.length > 0) {
+      const variantGroups = {};
+      media.variantImages.forEach(image => {
+        if (!variantGroups[image.variant]) {
+          variantGroups[image.variant] = [];
+        }
+        variantGroups[image.variant].push(image);
+      });
 
-    group.appendChild(mediaContainer);
-
-    const selectAllBtn = group.querySelector('.selectAllVariant');
-    selectAllBtn.addEventListener('click', () => toggleVariantSelection(variantName, group));
-
-    return group;
-  }
-
-  // Display main images (default variant)
-  if (media.mainImages && media.mainImages.length > 0) {
-    container.appendChild(createImageGroup(media.defaultVariant, media.mainImages, true));
-  }
-
-  // Display other variants
-  if (media.variantImages && media.variantImages.length > 0) {
-    const variantGroups = {};
-    
-    media.variantImages.forEach(image => {
-      if (!variantGroups[image.variant]) {
-        variantGroups[image.variant] = [];
-      }
-      variantGroups[image.variant].push(image);
-    });
-
-    Object.entries(variantGroups).forEach(([variantName, images]) => {
-      if (variantName !== media.defaultVariant) {
-        container.appendChild(createImageGroup(variantName, images));
-      }
-    });
+      Object.entries(variantGroups).forEach(([variantName, images]) => {
+        if (variantName !== media.defaultVariant) {
+          container.appendChild(createImageGroup(variantName, images, false, true));
+        }
+      });
+    }
   }
 
   if (container.children.length === 0) {
@@ -182,6 +167,48 @@ function displayImages(media) {
   }
 
   updateSelectionCount();
+}
+
+function createImageGroup(variantName, images, isDefault = false, hasMultipleVariants = true) {
+  const group = document.createElement('div');
+  group.className = 'variationGroup';
+  
+  if (hasMultipleVariants) {
+    const titleElem = document.createElement('div');
+    titleElem.className = 'variationTitle';
+    titleElem.innerHTML = `
+      ${variantName} (${images.length})
+      ${isDefault ? '<span class="defaultVariation"> (Default)</span>' : ''}
+      <button class="selectAllVariant" data-variant="${variantName}">Select All</button>
+    `;
+    group.appendChild(titleElem);
+  }
+
+  const asinElem = document.createElement('div');
+  asinElem.className = 'variantAsin';
+  asinElem.textContent = `ASIN: ${mediaData.variants[variantName].asin || 'N/A'}`;
+  group.appendChild(asinElem);
+
+  const mediaContainer = document.createElement('div');
+  mediaContainer.className = hasMultipleVariants ? 'mediaContainer' : 'imageGrid';
+
+  images.forEach(image => {
+    const imageUrl = image.url;
+    if (imageUrl && typeof imageUrl === 'string' && !imageUrl.includes('x-spritesheet')) {
+      mediaContainer.appendChild(createMediaElement(imageUrl, 'image', variantName));
+    }
+  });
+
+  group.appendChild(mediaContainer);
+
+  if (hasMultipleVariants) {
+    const selectAllBtn = group.querySelector('.selectAllVariant');
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', () => toggleVariantSelection(variantName, group));
+    }
+  }
+
+  return group;
 }
 
 function toggleVariantSelection(variantName, groupElement) {
@@ -226,6 +253,45 @@ function createMediaElement(url, type, variant, thumbnailUrl, isHLS, title, dura
   }
 
   return div;
+}
+
+function displayVideos(media) {
+  const container = document.getElementById('videoList');
+  container.innerHTML = '';
+
+  if (media.videos && media.videos.length > 0) {
+    media.videos.forEach(video => {
+      container.appendChild(createMediaElement(
+        video.url,
+        'video',
+        null,
+        video.thumbnailUrl,
+        video.isHLS,
+        video.title,
+        video.duration
+      ));
+    });
+  } else {
+    container.innerHTML = '<p>No videos found.</p>';
+  }
+}
+
+function updateMediaCounts(media) {
+  let imageCount = 0;
+  if (media.mainImages && Array.isArray(media.mainImages)) {
+    imageCount += media.mainImages.length;
+  }
+  if (media.variantImages && Array.isArray(media.variantImages)) {
+    imageCount += media.variantImages.length;
+  }
+  
+  document.getElementById('imageCount').textContent = imageCount;
+  
+  let videoCount = 0;
+  if (media.videos && Array.isArray(media.videos)) {
+    videoCount = media.videos.length;
+  }
+  document.getElementById('videoCount').textContent = videoCount;
 }
 
 function downloadSelected() {
@@ -310,63 +376,4 @@ function displayError(message) {
   container.innerHTML = `<p style="color: red;">${message}</p>`;
   document.getElementById('downloadSelected').disabled = true;
   document.getElementById('exportCSV').disabled = true;
-}
-
-// Additional function to display videos (if not already implemented)
-function displayVideos(media) {
-  const container = document.getElementById('videoList');
-  container.innerHTML = '';
-
-  if (media.videos && media.videos.length > 0) {
-    media.videos.forEach(video => {
-      container.appendChild(createMediaElement(
-        video.url,
-        'video',
-        null,
-        video.thumbnailUrl,
-        video.isHLS,
-        video.title,
-        video.duration
-      ));
-    });
-  } else {
-    container.innerHTML = '<p>No videos found.</p>';
-  }
-}
-
-// Function to display all media
-function displayMedia(media) {
-  try {
-    console.log('Received media data:', JSON.stringify(media, null, 2));
-    if (!media || typeof media !== 'object') {
-      throw new Error('Invalid media data received');
-    }
-    displayImages(media);
-    displayVideos(media);
-    updateMediaCounts(media);
-  } catch (error) {
-    console.error('Error displaying media:', error);
-    document.getElementById('imageVariations').innerHTML = '<p>Error loading images. Please try again.</p>';
-    document.getElementById('videoList').innerHTML = '<p>Error loading videos. Please try again.</p>';
-    document.getElementById('imageCount').textContent = '0';
-    document.getElementById('videoCount').textContent = '0';
-  }
-}
-
-function updateMediaCounts(media) {
-  let imageCount = 0;
-  if (media.mainImages && Array.isArray(media.mainImages)) {
-    imageCount += media.mainImages.length;
-  }
-  if (media.variantImages && Array.isArray(media.variantImages)) {
-    imageCount += media.variantImages.length;
-  }
-  
-  document.getElementById('imageCount').textContent = imageCount;
-  
-  let videoCount = 0;
-  if (media.videos && Array.isArray(media.videos)) {
-    videoCount = media.videos.length;
-  }
-  document.getElementById('videoCount').textContent = videoCount;
 }
